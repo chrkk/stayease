@@ -1,6 +1,3 @@
-# Environment / config
-config.php
-.env
 
 # OS clutter
 .DS_Store
