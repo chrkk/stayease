@@ -16,6 +16,5 @@ if (!isset($_SESSION['username'])) {
         <li><a href="boarders.php">Boarders</a></li>
         <li><a href="billing.php">Billing</a></li>
         <li><a href="maintenance.php">Maintenance</a></li>
-        <li><a href="logout.php" class="nav-login">Logout</a></li>
     </ul>
 </nav>
