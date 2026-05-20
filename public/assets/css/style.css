@@ -1019,15 +1019,15 @@ body {
     margin-bottom: 0.25rem;
 }
 
-/* Stat Cards Grid */
-.stats-grid {
+/* Stat Cards Grid (scoped to dashboard to avoid clobbering About styles) */
+.dashboard-main .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1.25rem;
     margin-bottom: 2.5rem;
 }
 
-.stat-card {
+.dashboard-main .stat-card {
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 12px;
@@ -1035,12 +1035,12 @@ body {
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 
-.stat-card--alert {
+.dashboard-main .stat-card--alert {
     border-color: #fbbf24;
     background: #fffbeb;
 }
 
-.stat-label {
+.dashboard-main .stat-label {
     font-size: 0.8rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -1049,7 +1049,7 @@ body {
     margin-bottom: 0.5rem;
 }
 
-.stat-value {
+.dashboard-main .stat-value {
     font-size: 2rem;
     font-weight: 700;
     color: #111;
