@@ -1,6 +1,6 @@
 <?php
 session_start();
-$con = mysqli_connect("127.0.0.1", "root", "", "stayeasedb") or die("Database connection error.");
+require_once 'config.php';
 
 $error = "";
 
