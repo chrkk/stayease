@@ -1,97 +1,111 @@
 <?php
 session_start();
+if (!isset($_SESSION['username'])) {
+    header("Location: login.php");
+    exit();
+}
 require_once 'config.php';
 
-$error = "";
+// --- STAT QUERIES ---
 
-if (isset($_POST['btnLogin'])) {
-    $uname = mysqli_real_escape_string($con, $_POST['txtUsername']);
-    $pwd = mysqli_real_escape_string($con, $_POST['txtPassword']);
+// Total rooms
+$totalRooms = $con->query("SELECT COUNT(*) FROM room")->fetch_row()[0];
 
-    $sql = "SELECT * FROM user WHERE username=? AND password=?";
-    $stmt = $con->prepare($sql);
-    $stmt->bind_param("ss", $uname, $pwd);
-    $stmt->execute();
-    $result = $stmt->get_result();
+// Total beds
+$totalBeds = $con->query("SELECT COUNT(*) FROM bed")->fetch_row()[0];
 
-    if ($result->num_rows == 1) {
-        $_SESSION['username'] = $uname; 
-        header("Location: dashboard.php");
-        exit();
-    } else {
-        $error = "<span class='error-msg'>Invalid username or password</span>";
-    }
-}
+// Occupied beds
+$occupiedBeds = $con->query("
+    SELECT COUNT(*) FROM bed WHERE occupancy_status = 'occupied'
+")->fetch_row()[0];
+
+// Active boarders (those with an active rental agreement)
+$totalBoarders = $con->query("
+    SELECT COUNT(*) FROM rental_agreement WHERE status = 'active'
+")->fetch_row()[0];
+
+// Recent maintenance logs — last 5 entries
+$recentLogs = $con->query("
+    SELECT ml.description, ml.status, ml.maintenance_date, r.room_number
+    FROM maintenance_log ml
+    JOIN room r ON ml.room_id = r.room_id
+    ORDER BY ml.maintenance_date DESC
+    LIMIT 5
+");
+
+$vacancy = $totalBeds - $occupiedBeds;
 ?>
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In | StayEase</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Dashboard | StayEase</title>
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body class="login-page">
+<body>
 
-    <div class="login-left">
-        <a href="index.html" class="login-logo">
-            <span class="logo-mark"></span>
-            STAYEASE
-        </a>
-        <div class="login-left-body">
-            <p class="login-left-label">Property Management System</p>
-            <h2 class="login-left-title">Your boarding house,<br>fully under control.</h2>
-            <ul class="login-feature-list">
-                <li>
-                    <span class="lf-dot"></span>
-                    Centralized tenant &amp; room records
-                </li>
-                <li>
-                    <span class="lf-dot"></span>
-                    Automated billing &amp; utility tracking
-                </li>
-                <li>
-                    <span class="lf-dot"></span>
-                    Real-time occupancy monitoring
-                </li>
-                <li>
-                    <span class="lf-dot"></span>
-                    Maintenance &amp; violation logs
-                </li>
-            </ul>
-        </div>
-        <p class="login-left-footer">Group 5 &mdash; StayEase &copy; 2025</p>
+<?php include 'includes/sidebar.php'; ?>
+
+<main class="dashboard-main">
+    <div class="dashboard-header">
+        <h1>Dashboard</h1>
+        <p>Welcome back, <strong><?= htmlspecialchars($_SESSION['username']) ?></strong></p>
     </div>
 
-    <div class="login-right">
-        <div class="login-card">
-            <p class="login-eyebrow">Landlord Portal</p>
-            <h2 class="login-title">Welcome back</h2>
-            <p class="login-sub">Sign in to manage your property</p>
-
-            <form method="post" action="login.php">
-                <div class="input-group">
-                    <label for="txtUsername">Username</label>
-                    <input type="text" id="txtUsername" placeholder="Enter your username" required name="txtUsername">
-                </div>
-
-                <div class="input-group">
-                    <label for="txtPassword">Password</label>
-                    <input type="password" id="txtPassword" placeholder="Enter your password" required name="txtPassword">
-                </div>
-
-                <?php echo $error; ?>
-
-                <button type="submit" class="login-btn" name="btnLogin">Sign in to dashboard</button>
-            </form>
-
-            <p class="login-footer">
-                <a href="index.html">&larr; Back to home</a>
-            </p>
+    <!-- Stat Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <p class="stat-label">Total Rooms</p>
+            <h2 class="stat-value"><?= $totalRooms ?></h2>
+        </div>
+        <div class="stat-card">
+            <p class="stat-label">Occupied Beds</p>
+            <h2 class="stat-value"><?= $occupiedBeds ?> / <?= $totalBeds ?></h2>
+        </div>
+        <div class="stat-card">
+            <p class="stat-label">Active Boarders</p>
+            <h2 class="stat-value"><?= $totalBoarders ?></h2>
+        </div>
+        <div class="stat-card stat-card--alert">
+            <p class="stat-label">Vacant Beds</p>
+            <h2 class="stat-value"><?= $vacancy ?></h2>
         </div>
     </div>
+
+    <!-- Recent Maintenance Activity -->
+    <div class="dashboard-table-section">
+        <h3>Recent Maintenance Activity</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Room</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if ($recentLogs && $recentLogs->num_rows > 0): ?>
+                    <?php while ($log = $recentLogs->fetch_assoc()): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($log['maintenance_date']) ?></td>
+                        <td>Room <?= htmlspecialchars($log['room_number']) ?></td>
+                        <td><?= htmlspecialchars($log['description']) ?></td>
+                        <td><span class="badge badge--<?= strtolower($log['status']) ?>"><?= htmlspecialchars($log['status']) ?></span></td>
+                    </tr>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="4" style="text-align:center; color: #888;">
+                            No maintenance logs yet.
+                        </td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</main>
 
 </body>
 </html>
