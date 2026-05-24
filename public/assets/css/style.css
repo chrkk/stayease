@@ -518,10 +518,9 @@ body {
 .actions-row {
     grid-column: span 2;
     display: flex;
-    justify-content: flex-start;
-    margin-top: 10px;
-    gap: 12px;
-}
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
 
 .inline-form {
     display: inline-flex;
@@ -565,14 +564,16 @@ body {
 
 .btn-primary,
 .btn-secondary {
-    display: inline-block;
-    padding: 14px 28px;
-    border-radius: 14px;
-    text-decoration: none;
-    font-weight: 700;
-    transition: transform 0.1s ease, background 0.2s ease;
-}
-
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        padding: 14px 28px;
+        min-width: 160px;
+        border-radius: 14px;
+        text-decoration: none;
+        font-weight: 700;
+        transition: transform 0.1s ease, background 0.2s ease;
+        text-align: center;
 .btn-primary {
     background: #111;
     color: #fff;
@@ -607,7 +608,7 @@ body {
     }
 
     .actions-row {
-        justify-content: stretch;
+        justify-content: center;
     }
 }
 .about-stats {
