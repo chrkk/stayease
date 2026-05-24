@@ -67,6 +67,10 @@ function refresh_room_occupancy_statuses($con) {
             }
         }
 
+        if ($row['status'] === 'maintenance') {
+            continue;
+        }
+
         if ($newStatus !== $row['status']) {
             $stmtStatus = $con->prepare("UPDATE room SET status = ? WHERE room_id = ?");
             $stmtStatus->bind_param('si', $newStatus, $row['room_id']);
