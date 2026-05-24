@@ -30,6 +30,26 @@ $vacancy = $totalBeds - $occupiedBeds;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | StayEase</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+        .btn-hero {
+            display: inline-block;
+            padding: 10px 22px;
+            background-color: #111;
+            color: #fff;
+            border: 2px solid #111;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+        .btn-hero:hover {
+            background-color: #333;
+            border-color: #333;
+            color: #fff;
+        }
+    </style>
 </head>
 <body>
 
@@ -55,6 +75,7 @@ $vacancy = $totalBeds - $occupiedBeds;
                 <h1>Dashboard</h1>
                 <p>Welcome back, <strong><?= htmlspecialchars($_SESSION['username']) ?></strong></p>
             </div>
+            <a href="profile.php" class="btn-hero">Edit Profile</a>
         </section>
 
         <section class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
