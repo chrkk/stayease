@@ -18,7 +18,6 @@ if (isset($_POST['btnAddRoom'])) {
     if (!$room_number) {
         $error = 'Room number is required.';
     } else {
-        // New rooms start as 'available' by default; occupancy refresher will adjust.
         $stmt = $con->prepare("INSERT INTO room (room_number, capacity, status) VALUES (?, ?, 'available')");
         $stmt->bind_param('si', $room_number, $capacity);
             if ($stmt->execute()) {
@@ -39,7 +38,6 @@ if (isset($_POST['btnUpdateRoom'])) {
     if (!$room_number || !$room_id) {
         $error = 'Room number and room selection are required.';
     } else {
-        // Status is automated; only update room_number and capacity here.
         $stmt = $con->prepare("UPDATE room SET room_number = ?, capacity = ? WHERE room_id = ?");
         $stmt->bind_param('sii', $room_number, $capacity, $room_id);
         if ($stmt->execute()) {
@@ -95,7 +93,6 @@ if (isset($_POST['toggleMaintenance'])) {
     }
 }
 
-// Handle room deletion (only allow if no beds exist for the room)
 if (isset($_POST['deleteRoom'])) {
     $del_room_id = intval($_POST['room_id'] ?? 0);
     if ($del_room_id > 0) {
@@ -233,7 +230,6 @@ $roomList = $con->query($sqlRooms);
                     <label for="capacity">Capacity</label>
                     <input type="number" id="capacity" name="capacity" min="0" value="<?php echo $edit_room ? intval($edit_room['capacity']) : '0'; ?>" required>
                 </div>
-                <!-- Status is automatic and not editable here -->
                 <div class="input-group input-full actions-row">
                     <?php if ($edit_room): ?>
                         <button type="submit" class="btn-primary" name="btnUpdateRoom">Update Room</button>
