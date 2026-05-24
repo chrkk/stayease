@@ -14,13 +14,13 @@ $edit_room = null;
 if (isset($_POST['btnAddRoom'])) {
     $room_number = mysqli_real_escape_string($con, trim($_POST['room_number']));
     $capacity = intval($_POST['capacity']);
-    $status = mysqli_real_escape_string($con, $_POST['status']);
 
     if (!$room_number) {
         $error = 'Room number is required.';
     } else {
-        $stmt = $con->prepare("INSERT INTO room (room_number, capacity, status) VALUES (?, ?, ?)");
-        $stmt->bind_param('sis', $room_number, $capacity, $status);
+        // New rooms start as 'available' by default; occupancy refresher will adjust.
+        $stmt = $con->prepare("INSERT INTO room (room_number, capacity, status) VALUES (?, ?, 'available')");
+        $stmt->bind_param('si', $room_number, $capacity);
         if ($stmt->execute()) {
             $message = 'Room added successfully.';
         } else {
@@ -34,19 +34,62 @@ if (isset($_POST['btnUpdateRoom'])) {
     $room_id = intval($_POST['room_id']);
     $room_number = mysqli_real_escape_string($con, trim($_POST['room_number']));
     $capacity = intval($_POST['capacity']);
-    $status = mysqli_real_escape_string($con, $_POST['status']);
 
     if (!$room_number || !$room_id) {
         $error = 'Room number and room selection are required.';
     } else {
-        $stmt = $con->prepare("UPDATE room SET room_number = ?, capacity = ?, status = ? WHERE room_id = ?");
-        $stmt->bind_param('sisi', $room_number, $capacity, $status, $room_id);
+        // Status is automated; only update room_number and capacity here.
+        $stmt = $con->prepare("UPDATE room SET room_number = ?, capacity = ? WHERE room_id = ?");
+        $stmt->bind_param('sii', $room_number, $capacity, $room_id);
         if ($stmt->execute()) {
             $message = 'Room updated successfully.';
         } else {
             $error = 'Unable to update room. Please try again.';
         }
         $stmt->close();
+    }
+}
+
+
+if (isset($_POST['toggleMaintenance'])) {
+    $toggle_room_id = intval($_POST['room_id'] ?? 0);
+    if ($toggle_room_id > 0) {
+    
+        $stmtS = $con->prepare("SELECT status FROM room WHERE room_id = ? LIMIT 1");
+        $stmtS->bind_param('i', $toggle_room_id);
+        $stmtS->execute();
+        $resS = $stmtS->get_result();
+        $rowS = $resS->fetch_assoc();
+        $stmtS->close();
+
+        if ($rowS && $rowS['status'] === 'maintenance') {
+        
+            $stmtCount = $con->prepare("SELECT r.capacity, COALESCE(SUM(CASE WHEN b.occupancy_status = 'occupied' THEN 1 ELSE 0 END),0) AS occupied_beds FROM room r LEFT JOIN bed b ON r.room_id = b.room_id WHERE r.room_id = ? GROUP BY r.room_id");
+            $stmtCount->bind_param('i', $toggle_room_id);
+            $stmtCount->execute();
+            $resCount = $stmtCount->get_result();
+            $cnt = $resCount->fetch_assoc();
+            $stmtCount->close();
+
+            $newStatus = 'available';
+            if ($cnt && intval($cnt['occupied_beds']) > 0) {
+                if (intval($cnt['capacity']) > 0 && intval($cnt['occupied_beds']) >= intval($cnt['capacity'])) {
+                    $newStatus = 'full';
+                } else {
+                    $newStatus = 'occupied';
+                }
+            }
+            $stmtU = $con->prepare("UPDATE room SET status = ? WHERE room_id = ?");
+            $stmtU->bind_param('si', $newStatus, $toggle_room_id);
+            $stmtU->execute();
+            $stmtU->close();
+        } else {
+           
+            $stmtU = $con->prepare("UPDATE room SET status = 'maintenance' WHERE room_id = ?");
+            $stmtU->bind_param('i', $toggle_room_id);
+            $stmtU->execute();
+            $stmtU->close();
+        }
     }
 }
 
