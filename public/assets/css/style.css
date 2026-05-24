@@ -398,6 +398,63 @@ body {
     gap: 20px;
 }
 
+/* Generic button styles used across the app */
+.btn-primary {
+    display: inline-block;
+    padding: 8px 12px;
+    background: #111;
+    color: #fff;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13px;
+    border: 1px solid rgba(0,0,0,0.2);
+    transition: background 0.12s ease, transform 0.08s ease;
+}
+.btn-primary:hover { background: #000; transform: translateY(-1px); }
+
+.btn-secondary {
+    display: inline-block;
+    padding: 7px 12px;
+    background: transparent;
+    color: #111;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13px;
+    border: 1px solid #e0e0e0;
+}
+.btn-secondary:hover { background: #f5f5f5; }
+
+.btn-danger {
+    display: inline-block;
+    padding: 7px 12px;
+    background: #c0392b;
+    color: #fff;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13px;
+    border: 1px solid rgba(0,0,0,0.08);
+}
+.btn-danger:hover { background: #a93226; }
+
+.link-button {
+    display: inline-block;
+    color: #111;
+    text-decoration: none;
+    font-weight: 700;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+}
+.link-button:hover { background: #fafafa; }
+
+/* Make inline table forms' buttons align and not overflow */
+table.data-table form { display: inline-block; margin: 0; }
+table.data-table .btn-primary, table.data-table .btn-secondary, table.data-table .btn-danger { font-size: 12px; padding: 6px 8px; }
+
 /* Occupancy progress bar inside tables */
 .occupancy-bar {
     height: 8px;
