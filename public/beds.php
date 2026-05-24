@@ -2,6 +2,7 @@
 session_start();
 require_once 'config.php';
 
+// Security Gatekeeper
 if (!isset($_SESSION['username'])) {
     header("Location: login.php");
     exit();
@@ -9,7 +10,14 @@ if (!isset($_SESSION['username'])) {
 
 $message = '';
 $error = '';
+$edit_bed = null; 
 
+// --- PRG PATTERN: CATCH SUCCESS REDIRECT ---
+if (isset($_GET['status']) && $_GET['status'] === 'updated') {
+    $message = 'Bed updated successfully.';
+}
+
+// --- LOGIC FOR ADDING A NEW BED ---
 if (isset($_POST['btnAddBed'])) {
     $bed_number = mysqli_real_escape_string($con, trim($_POST['bed_number']));
     $room_number = mysqli_real_escape_string($con, trim($_POST['room_number']));
@@ -20,6 +28,7 @@ if (isset($_POST['btnAddBed'])) {
     } else {
         $room_id = null;
 
+        // Smart Room Check
         if ($room_number !== '') {
             $stmtRoom = $con->prepare("SELECT room_id FROM room WHERE room_number = ? LIMIT 1");
             $stmtRoom->bind_param('s', $room_number);
@@ -56,6 +65,73 @@ if (isset($_POST['btnAddBed'])) {
     }
 }
 
+// --- LOGIC FOR UPDATING AN EXISTING BED ---
+if (isset($_POST['btnUpdateBed'])) {
+    $bed_id = intval($_POST['bed_id']);
+    $bed_number = mysqli_real_escape_string($con, trim($_POST['bed_number']));
+    $room_number = mysqli_real_escape_string($con, trim($_POST['room_number']));
+    $occupancy_status = mysqli_real_escape_string($con, $_POST['occupancy_status']);
+
+    if (!$bed_number || !$bed_id) {
+        $error = 'Bed number is required.';
+    } else {
+        $room_id = null;
+
+        // Smart Room Check (Same as adding)
+        if ($room_number !== '') {
+            $stmtRoom = $con->prepare("SELECT room_id FROM room WHERE room_number = ? LIMIT 1");
+            $stmtRoom->bind_param('s', $room_number);
+            $stmtRoom->execute();
+            $roomResult = $stmtRoom->get_result();
+
+            if ($roomRow = $roomResult->fetch_assoc()) {
+                $room_id = $roomRow['room_id'];
+            } else {
+                $stmtCreateRoom = $con->prepare("INSERT INTO room (room_number, capacity, status) VALUES (?, 0, 'available')");
+                $stmtCreateRoom->bind_param('s', $room_number);
+                if ($stmtCreateRoom->execute()) {
+                    $room_id = $con->insert_id;
+                }
+                $stmtCreateRoom->close();
+            }
+            $stmtRoom->close();
+        }
+
+        // Execute the Update
+        if ($room_id !== null) {
+            $stmtUpdate = $con->prepare("UPDATE bed SET room_id = ?, bed_number = ?, occupancy_status = ? WHERE bed_id = ?");
+            $stmtUpdate->bind_param('issi', $room_id, $bed_number, $occupancy_status, $bed_id);
+        } else {
+            $stmtUpdate = $con->prepare("UPDATE bed SET room_id = NULL, bed_number = ?, occupancy_status = ? WHERE bed_id = ?");
+            $stmtUpdate->bind_param('ssi', $bed_number, $occupancy_status, $bed_id);
+        }
+
+        if ($stmtUpdate->execute()) {
+            $stmtUpdate->close();
+            // PRG REDIRECT: Snap back to clean URL
+            header("Location: beds.php?status=updated");
+            exit();
+        } else {
+            $error = 'Unable to update the bed. Please try again.';
+            $stmtUpdate->close();
+        }
+    }
+}
+
+// --- FETCH DATA IF WE ARE IN EDIT MODE ---
+if (isset($_GET['edit_id'])) {
+    $edit_id = intval($_GET['edit_id']);
+    if ($edit_id > 0) {
+        $stmt = $con->prepare("SELECT bed.bed_id, bed.bed_number, bed.occupancy_status, room.room_number FROM bed LEFT JOIN room ON bed.room_id = room.room_id WHERE bed.bed_id = ? LIMIT 1");
+        $stmt->bind_param('i', $edit_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $edit_bed = $result->fetch_assoc();
+        $stmt->close();
+    }
+}
+
+// --- FETCH ALL BEDS FOR THE TABLE ---
 $sqlBeds = "SELECT bed.bed_id, bed.bed_number, bed.occupancy_status, room.room_number
             FROM bed
             LEFT JOIN room ON bed.room_id = room.room_id
@@ -99,32 +175,48 @@ $bedList = $con->query($sqlBeds);
 
         <section class="panel form-panel">
             <div class="panel-heading">
-                <h2>Add New Bed</h2>
+                <h2><?php echo $edit_bed ? 'Edit Bed' : 'Add New Bed'; ?></h2>
             </div>
+            
             <?php if ($message): ?>
                 <div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div>
             <?php endif; ?>
+            
             <?php if ($error): ?>
                 <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
-            <form method="post" action="beds.php" class="form-grid">
+            
+            <form method="post" action="beds.php<?php echo $edit_bed ? '?edit_id=' . intval($edit_bed['bed_id']) : ''; ?>" class="form-grid">
+                
+                <?php if ($edit_bed): ?>
+                    <input type="hidden" name="bed_id" value="<?php echo intval($edit_bed['bed_id']); ?>">
+                <?php endif; ?>
+
                 <div class="input-group">
                     <label for="bed_number">Bed Number</label>
-                    <input type="text" id="bed_number" name="bed_number" required>
+                    <input type="text" id="bed_number" name="bed_number" required value="<?php echo $edit_bed ? htmlspecialchars($edit_bed['bed_number']) : ''; ?>">
                 </div>
+                
                 <div class="input-group">
                     <label for="room_number">Room Number (optional)</label>
-                    <input type="text" id="room_number" name="room_number" placeholder="Example: 101">
+                    <input type="text" id="room_number" name="room_number" placeholder="Example: 101" value="<?php echo $edit_bed && $edit_bed['room_number'] ? htmlspecialchars($edit_bed['room_number']) : ''; ?>">
                 </div>
+                
                 <div class="input-group">
                     <label for="occupancy_status">Occupancy Status</label>
                     <select id="occupancy_status" name="occupancy_status" required>
-                        <option value="vacant">Vacant</option>
-                        <option value="occupied">Occupied</option>
+                        <option value="vacant" <?php echo $edit_bed && $edit_bed['occupancy_status'] === 'vacant' ? 'selected' : ''; ?>>Vacant</option>
+                        <option value="occupied" <?php echo $edit_bed && $edit_bed['occupancy_status'] === 'occupied' ? 'selected' : ''; ?>>Occupied</option>
                     </select>
                 </div>
+                
                 <div class="input-group input-full actions-row">
-                    <button type="submit" class="btn-primary" name="btnAddBed">Create Bed</button>
+                    <?php if ($edit_bed): ?>
+                        <button type="submit" class="btn-primary" name="btnUpdateBed">Update Bed</button>
+                        <a href="beds.php" class="btn-secondary" style="margin-left:12px;">Cancel</a>
+                    <?php else: ?>
+                        <button type="submit" class="btn-primary" name="btnAddBed">Create Bed</button>
+                    <?php endif; ?>
                 </div>
             </form>
         </section>
@@ -141,6 +233,7 @@ $bedList = $con->query($sqlBeds);
                             <th>Bed Number</th>
                             <th>Room</th>
                             <th>Status</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -157,11 +250,14 @@ $bedList = $con->query($sqlBeds);
                                             <span class="tag">Vacant</span>
                                         <?php endif; ?>
                                     </td>
+                                    <td>
+                                        <a href="beds.php?edit_id=<?php echo intval($row['bed_id']); ?>" class="link-button">Edit</a>
+                                    </td>
                                 </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="4" class="empty-state">No beds have been added yet. Create a bed to make it available for boarders.</td>
+                                <td colspan="5" class="empty-state">No beds have been added yet. Create a bed to make it available for boarders.</td>
                             </tr>
                         <?php endif; ?>
                     </tbody>
@@ -170,4 +266,4 @@ $bedList = $con->query($sqlBeds);
         </section>
     </main>
 </body>
-</html>
+</html>c
