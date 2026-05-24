@@ -192,9 +192,7 @@ $roomList = $con->query($sqlRooms);
                             <th>Room</th>
                             <th>Capacity</th>
                             <th>Status</th>
-                            <th>Total Beds</th>
-                            <th>Occupied</th>
-                            <th>Vacant</th>
+                            <th>Occupancy</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -205,9 +203,24 @@ $roomList = $con->query($sqlRooms);
                                     <td><?php echo htmlspecialchars($row['room_number']); ?></td>
                                     <td><?php echo intval($row['capacity']); ?></td>
                                     <td><?php echo htmlspecialchars($row['status'] === 'full' ? 'Fully occupied' : ucfirst($row['status'])); ?></td>
-                                    <td><?php echo intval($row['total_beds']); ?></td>
-                                    <td><?php echo intval($row['occupied_beds']); ?></td>
-                                    <td><?php echo intval($row['vacant_beds']); ?></td>
+                                    <td>
+                                        <?php
+                                            if ($row['status'] === 'maintenance') {
+                                                echo '-';
+                                            } else {
+                                                $occ = intval($row['occupied_beds']);
+                                                $cap = intval($row['capacity']);
+                                                $cap = $cap >= 0 ? $cap : 0;
+                                                $pct = ($cap > 0) ? round(($occ / $cap) * 100) : 0;
+                                                echo $occ . '/' . $cap;
+                                                ?>
+                                                <div class="occupancy-bar" aria-hidden="true">
+                                                    <div class="occupancy-fill" style="width: <?php echo htmlspecialchars($pct); ?>%; background: <?php echo ($pct >= 100 ? '#c0392b' : ($pct >= 70 ? '#f39c12' : '#27ae60')); ?>;"></div>
+                                                </div>
+                                                <?php
+                                            }
+                                        ?>
+                                    </td>
                                     <td>
                                         <a href="rooms.php?edit_id=<?php echo intval($row['room_id']); ?>" class="link-button">Edit</a>
                                     </td>

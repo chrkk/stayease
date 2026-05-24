@@ -398,6 +398,25 @@ body {
     gap: 20px;
 }
 
+/* Occupancy progress bar inside tables */
+.occupancy-bar {
+    height: 8px;
+    background: #f1f1f1;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 6px;
+    width: 96px;
+}
+.occupancy-fill {
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.data-table td {
+    vertical-align: middle;
+}
+
 .summary-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
