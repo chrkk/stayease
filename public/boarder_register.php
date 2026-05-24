@@ -10,7 +10,17 @@ if (!isset($_SESSION['username'])) {
 $message = '';
 $error = '';
 
-$bedResult = $con->query("SELECT bed.bed_id, bed.bed_number, room.room_number FROM bed LEFT JOIN room ON bed.room_id = room.room_id WHERE bed.occupancy_status IS NULL OR bed.occupancy_status <> 'occupied' ORDER BY room.room_number, bed.bed_number");
+// Allow preselecting a room via GET param (rooms.php?room_id=NN)
+$selected_room_id = isset($_GET['room_id']) ? intval($_GET['room_id']) : 0;
+if ($selected_room_id > 0) {
+    $stmtBeds = $con->prepare("SELECT bed.bed_id, bed.bed_number, room.room_number FROM bed LEFT JOIN room ON bed.room_id = room.room_id WHERE (bed.occupancy_status IS NULL OR bed.occupancy_status <> 'occupied') AND bed.room_id = ? ORDER BY room.room_number, bed.bed_number");
+    $stmtBeds->bind_param('i', $selected_room_id);
+    $stmtBeds->execute();
+    $bedResult = $stmtBeds->get_result();
+    $stmtBeds->close();
+} else {
+    $bedResult = $con->query("SELECT bed.bed_id, bed.bed_number, room.room_number FROM bed LEFT JOIN room ON bed.room_id = room.room_id WHERE bed.occupancy_status IS NULL OR bed.occupancy_status <> 'occupied' ORDER BY room.room_number, bed.bed_number");
+}
 
 function refresh_room_status_by_bed($con, $bed_id) {
     $stmtRoom = $con->prepare("SELECT room_id FROM bed WHERE bed_id = ? LIMIT 1");

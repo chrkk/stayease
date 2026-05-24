@@ -21,11 +21,12 @@ if (isset($_POST['btnAddRoom'])) {
         // New rooms start as 'available' by default; occupancy refresher will adjust.
         $stmt = $con->prepare("INSERT INTO room (room_number, capacity, status) VALUES (?, ?, 'available')");
         $stmt->bind_param('si', $room_number, $capacity);
-        if ($stmt->execute()) {
-            $message = 'Room added successfully.';
-        } else {
-            $error = 'Unable to add room. Please try again.';
-        }
+            if ($stmt->execute()) {
+                $message = 'Room added successfully.';
+                refresh_room_occupancy_statuses($con);
+            } else {
+                $error = 'Unable to add room. Please try again.';
+            }
         $stmt->close();
     }
 }
@@ -43,6 +44,7 @@ if (isset($_POST['btnUpdateRoom'])) {
         $stmt->bind_param('sii', $room_number, $capacity, $room_id);
         if ($stmt->execute()) {
             $message = 'Room updated successfully.';
+            refresh_room_occupancy_statuses($con);
         } else {
             $error = 'Unable to update room. Please try again.';
         }
@@ -204,15 +206,7 @@ $roomList = $con->query($sqlRooms);
                     <label for="capacity">Capacity</label>
                     <input type="number" id="capacity" name="capacity" min="0" value="<?php echo $edit_room ? intval($edit_room['capacity']) : '0'; ?>" required>
                 </div>
-                <div class="input-group">
-                    <label for="status">Status</label>
-                    <select id="status" name="status" required>
-                            <option value="available" <?php echo $edit_room && $edit_room['status'] === 'available' ? 'selected' : ''; ?>>Available</option>
-                        <option value="occupied" <?php echo $edit_room && $edit_room['status'] === 'occupied' ? 'selected' : ''; ?>>Occupied</option>
-                        <option value="full" <?php echo $edit_room && $edit_room['status'] === 'full' ? 'selected' : ''; ?>>Fully occupied</option>
-                        <option value="maintenance" <?php echo $edit_room && $edit_room['status'] === 'maintenance' ? 'selected' : ''; ?>>Maintenance</option>
-                    </select>
-                </div>
+                <!-- Status is automatic and not editable here -->
                 <div class="input-group input-full actions-row">
                     <?php if ($edit_room): ?>
                         <button type="submit" class="btn-primary" name="btnUpdateRoom">Update Room</button>
@@ -266,12 +260,26 @@ $roomList = $con->query($sqlRooms);
                                     </td>
                                     <td>
                                         <a href="rooms.php?edit_id=<?php echo intval($row['room_id']); ?>" class="link-button">Edit</a>
+                                        <?php if ($row['status'] !== 'maintenance'): ?>
+                                            <?php if (intval($row['vacant_beds']) > 0): ?>
+                                                <a href="boarder_register.php?room_id=<?php echo intval($row['room_id']); ?>" class="btn-primary" style="margin-left:8px;">Add Tenant</a>
+                                            <?php endif; ?>
+                                            <form method="post" action="rooms.php" style="display:inline-block; margin-left:8px;">
+                                                <input type="hidden" name="room_id" value="<?php echo intval($row['room_id']); ?>">
+                                                <button type="submit" name="toggleMaintenance" class="btn-secondary">Mark Maintenance</button>
+                                            </form>
+                                        <?php else: ?>
+                                            <form method="post" action="rooms.php" style="display:inline-block; margin-left:8px;">
+                                                <input type="hidden" name="room_id" value="<?php echo intval($row['room_id']); ?>">
+                                                <button type="submit" name="toggleMaintenance" class="btn-primary">Clear Maintenance</button>
+                                            </form>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="7" class="empty-state">No rooms found yet. Add a room to get started.</td>
+                                <td colspan="5" class="empty-state">No rooms found yet. Add a room to get started.</td>
                             </tr>
                         <?php endif; ?>
                     </tbody>
