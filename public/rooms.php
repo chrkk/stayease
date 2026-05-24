@@ -95,6 +95,33 @@ if (isset($_POST['toggleMaintenance'])) {
     }
 }
 
+// Handle room deletion (only allow if no beds exist for the room)
+if (isset($_POST['deleteRoom'])) {
+    $del_room_id = intval($_POST['room_id'] ?? 0);
+    if ($del_room_id > 0) {
+        // Check for beds
+        $stmtB = $con->prepare("SELECT COUNT(*) AS bed_count FROM bed WHERE room_id = ?");
+        $stmtB->bind_param('i', $del_room_id);
+        $stmtB->execute();
+        $resB = $stmtB->get_result();
+        $cntB = $resB->fetch_assoc();
+        $stmtB->close();
+
+        if ($cntB && intval($cntB['bed_count']) > 0) {
+            $error = 'Cannot delete room that still has beds. Remove beds first.';
+        } else {
+            $stmtD = $con->prepare("DELETE FROM room WHERE room_id = ?");
+            $stmtD->bind_param('i', $del_room_id);
+            if ($stmtD->execute()) {
+                $message = 'Room deleted successfully.';
+            } else {
+                $error = 'Unable to delete room. Please try again.';
+            }
+            $stmtD->close();
+        }
+    }
+}
+
 function refresh_room_occupancy_statuses($con) {
     $statusSql = "SELECT r.room_id, r.capacity, r.status,
                          COALESCE(SUM(CASE WHEN b.occupancy_status = 'occupied' THEN 1 ELSE 0 END), 0) AS occupied_beds
@@ -274,6 +301,11 @@ $roomList = $con->query($sqlRooms);
                                                 <button type="submit" name="toggleMaintenance" class="btn-primary">Clear Maintenance</button>
                                             </form>
                                         <?php endif; ?>
+
+                                        <form method="post" action="rooms.php" style="display:inline-block; margin-left:8px;" onsubmit="return confirm('Delete this room? This action cannot be undone.');">
+                                            <input type="hidden" name="room_id" value="<?php echo intval($row['room_id']); ?>">
+                                            <button type="submit" name="deleteRoom" class="btn-danger">Delete</button>
+                                        </form>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
