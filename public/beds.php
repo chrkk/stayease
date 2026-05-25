@@ -10,44 +10,25 @@ if (!isset($_SESSION['username'])) {
 
 $message = '';
 $error = '';
-$edit_bed = null; 
+$edit_bed = null;
 
 // --- PRG PATTERN: CATCH SUCCESS REDIRECT ---
 if (isset($_GET['status']) && $_GET['status'] === 'updated') {
     $message = 'Bed updated successfully.';
 }
 
+// --- FETCH ALL EXISTING ROOMS FOR THE DROPDOWN ---
+$roomList = $con->query("SELECT room_id, room_number FROM room ORDER BY room_number ASC");
+
 // --- LOGIC FOR ADDING A NEW BED ---
 if (isset($_POST['btnAddBed'])) {
-    $bed_number = mysqli_real_escape_string($con, trim($_POST['bed_number']));
-    $room_number = mysqli_real_escape_string($con, trim($_POST['room_number']));
+    $bed_number      = mysqli_real_escape_string($con, trim($_POST['bed_number']));
+    $room_id         = !empty($_POST['room_id']) ? intval($_POST['room_id']) : null;
     $occupancy_status = mysqli_real_escape_string($con, $_POST['occupancy_status']);
 
     if (!$bed_number) {
         $error = 'Bed number is required.';
     } else {
-        $room_id = null;
-
-        // Smart Room Check
-        if ($room_number !== '') {
-            $stmtRoom = $con->prepare("SELECT room_id FROM room WHERE room_number = ? LIMIT 1");
-            $stmtRoom->bind_param('s', $room_number);
-            $stmtRoom->execute();
-            $roomResult = $stmtRoom->get_result();
-
-            if ($roomRow = $roomResult->fetch_assoc()) {
-                $room_id = $roomRow['room_id'];
-            } else {
-                $stmtCreateRoom = $con->prepare("INSERT INTO room (room_number, capacity, status) VALUES (?, 0, 'available')");
-                $stmtCreateRoom->bind_param('s', $room_number);
-                if ($stmtCreateRoom->execute()) {
-                    $room_id = $con->insert_id;
-                }
-                $stmtCreateRoom->close();
-            }
-            $stmtRoom->close();
-        }
-
         if ($room_id !== null) {
             $stmtBed = $con->prepare("INSERT INTO bed (room_id, bed_number, occupancy_status) VALUES (?, ?, ?)");
             $stmtBed->bind_param('iss', $room_id, $bed_number, $occupancy_status);
@@ -67,37 +48,14 @@ if (isset($_POST['btnAddBed'])) {
 
 // --- LOGIC FOR UPDATING AN EXISTING BED ---
 if (isset($_POST['btnUpdateBed'])) {
-    $bed_id = intval($_POST['bed_id']);
-    $bed_number = mysqli_real_escape_string($con, trim($_POST['bed_number']));
-    $room_number = mysqli_real_escape_string($con, trim($_POST['room_number']));
+    $bed_id          = intval($_POST['bed_id']);
+    $bed_number      = mysqli_real_escape_string($con, trim($_POST['bed_number']));
+    $room_id         = !empty($_POST['room_id']) ? intval($_POST['room_id']) : null;
     $occupancy_status = mysqli_real_escape_string($con, $_POST['occupancy_status']);
 
     if (!$bed_number || !$bed_id) {
         $error = 'Bed number is required.';
     } else {
-        $room_id = null;
-
-        // Smart Room Check (Same as adding)
-        if ($room_number !== '') {
-            $stmtRoom = $con->prepare("SELECT room_id FROM room WHERE room_number = ? LIMIT 1");
-            $stmtRoom->bind_param('s', $room_number);
-            $stmtRoom->execute();
-            $roomResult = $stmtRoom->get_result();
-
-            if ($roomRow = $roomResult->fetch_assoc()) {
-                $room_id = $roomRow['room_id'];
-            } else {
-                $stmtCreateRoom = $con->prepare("INSERT INTO room (room_number, capacity, status) VALUES (?, 0, 'available')");
-                $stmtCreateRoom->bind_param('s', $room_number);
-                if ($stmtCreateRoom->execute()) {
-                    $room_id = $con->insert_id;
-                }
-                $stmtCreateRoom->close();
-            }
-            $stmtRoom->close();
-        }
-
-        // Execute the Update
         if ($room_id !== null) {
             $stmtUpdate = $con->prepare("UPDATE bed SET room_id = ?, bed_number = ?, occupancy_status = ? WHERE bed_id = ?");
             $stmtUpdate->bind_param('issi', $room_id, $bed_number, $occupancy_status, $bed_id);
@@ -108,7 +66,6 @@ if (isset($_POST['btnUpdateBed'])) {
 
         if ($stmtUpdate->execute()) {
             $stmtUpdate->close();
-            // PRG REDIRECT: Snap back to clean URL
             header("Location: beds.php?status=updated");
             exit();
         } else {
@@ -122,7 +79,7 @@ if (isset($_POST['btnUpdateBed'])) {
 if (isset($_GET['edit_id'])) {
     $edit_id = intval($_GET['edit_id']);
     if ($edit_id > 0) {
-        $stmt = $con->prepare("SELECT bed.bed_id, bed.bed_number, bed.occupancy_status, room.room_number FROM bed LEFT JOIN room ON bed.room_id = room.room_id WHERE bed.bed_id = ? LIMIT 1");
+        $stmt = $con->prepare("SELECT bed_id, bed_number, occupancy_status, room_id FROM bed WHERE bed_id = ? LIMIT 1");
         $stmt->bind_param('i', $edit_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -132,12 +89,12 @@ if (isset($_GET['edit_id'])) {
 }
 
 // --- FETCH ALL BEDS FOR THE TABLE ---
-$sqlBeds = "SELECT bed.bed_id, bed.bed_number, bed.occupancy_status, room.room_number
-            FROM bed
-            LEFT JOIN room ON bed.room_id = room.room_id
-            ORDER BY room.room_number, bed.bed_number";
-
-$bedList = $con->query($sqlBeds);
+$bedList = $con->query("
+    SELECT bed.bed_id, bed.bed_number, bed.occupancy_status, room.room_number
+    FROM bed
+    LEFT JOIN room ON bed.room_id = room.room_id
+    ORDER BY room.room_number, bed.bed_number
+");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -170,46 +127,62 @@ $bedList = $con->query($sqlBeds);
                 <h1>Beds &amp; Availability</h1>
                 <p>Add beds to your property and track which ones are available for assignment.</p>
             </div>
-            <a href="boarder_register.php" class="btn-secondary">Register Boarder</a>
         </section>
 
         <section class="panel form-panel">
             <div class="panel-heading">
-                <h2><?php echo $edit_bed ? 'Edit Bed' : 'Add New Bed'; ?></h2>
+                <h2><?= $edit_bed ? 'Edit Bed' : 'Add New Bed' ?></h2>
             </div>
-            
+
             <?php if ($message): ?>
-                <div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div>
+                <div class="alert alert-success"><?= htmlspecialchars($message) ?></div>
             <?php endif; ?>
-            
+
             <?php if ($error): ?>
-                <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
+                <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
             <?php endif; ?>
-            
-            <form method="post" action="beds.php<?php echo $edit_bed ? '?edit_id=' . intval($edit_bed['bed_id']) : ''; ?>" class="form-grid">
-                
+
+            <form method="post" action="beds.php<?= $edit_bed ? '?edit_id=' . intval($edit_bed['bed_id']) : '' ?>" class="form-grid">
+
                 <?php if ($edit_bed): ?>
-                    <input type="hidden" name="bed_id" value="<?php echo intval($edit_bed['bed_id']); ?>">
+                    <input type="hidden" name="bed_id" value="<?= intval($edit_bed['bed_id']) ?>">
                 <?php endif; ?>
 
                 <div class="input-group">
                     <label for="bed_number">Bed Number</label>
-                    <input type="text" id="bed_number" name="bed_number" required value="<?php echo $edit_bed ? htmlspecialchars($edit_bed['bed_number']) : ''; ?>">
+                    <input type="text" id="bed_number" name="bed_number" required
+                           value="<?= $edit_bed ? htmlspecialchars($edit_bed['bed_number']) : '' ?>">
                 </div>
-                
+
                 <div class="input-group">
-                    <label for="room_number">Room Number (optional)</label>
-                    <input type="text" id="room_number" name="room_number" placeholder="Example: 101" value="<?php echo $edit_bed && $edit_bed['room_number'] ? htmlspecialchars($edit_bed['room_number']) : ''; ?>">
+                    <label for="room_id">Assign to Room</label>
+                    <select id="room_id" name="room_id">
+                        <option value="">— Unassigned —</option>
+                        <?php
+                        // Rewind the result set in case it was already iterated
+                        if ($roomList && $roomList->num_rows > 0):
+                            $roomList->data_seek(0);
+                            while ($room = $roomList->fetch_assoc()):
+                                $selected = ($edit_bed && $edit_bed['room_id'] == $room['room_id']) ? 'selected' : '';
+                        ?>
+                            <option value="<?= intval($room['room_id']) ?>" <?= $selected ?>>
+                                Room <?= htmlspecialchars($room['room_number']) ?>
+                            </option>
+                        <?php
+                            endwhile;
+                        endif;
+                        ?>
+                    </select>
                 </div>
-                
+
                 <div class="input-group">
                     <label for="occupancy_status">Occupancy Status</label>
                     <select id="occupancy_status" name="occupancy_status" required>
-                        <option value="vacant" <?php echo $edit_bed && $edit_bed['occupancy_status'] === 'vacant' ? 'selected' : ''; ?>>Vacant</option>
-                        <option value="occupied" <?php echo $edit_bed && $edit_bed['occupancy_status'] === 'occupied' ? 'selected' : ''; ?>>Occupied</option>
+                        <option value="vacant"   <?= $edit_bed && $edit_bed['occupancy_status'] === 'vacant'   ? 'selected' : '' ?>>Vacant</option>
+                        <option value="occupied" <?= $edit_bed && $edit_bed['occupancy_status'] === 'occupied' ? 'selected' : '' ?>>Occupied</option>
                     </select>
                 </div>
-                
+
                 <div class="input-group input-full actions-row">
                     <?php if ($edit_bed): ?>
                         <button type="submit" class="btn-primary" name="btnUpdateBed">Update Bed</button>
@@ -240,9 +213,9 @@ $bedList = $con->query($sqlBeds);
                         <?php if ($bedList && $bedList->num_rows > 0): ?>
                             <?php while ($row = $bedList->fetch_assoc()): ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($row['bed_id']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['bed_number']); ?></td>
-                                    <td><?php echo $row['room_number'] ? 'Room ' . htmlspecialchars($row['room_number']) : 'Unassigned'; ?></td>
+                                    <td><?= htmlspecialchars($row['bed_id']) ?></td>
+                                    <td><?= htmlspecialchars($row['bed_number']) ?></td>
+                                    <td><?= $row['room_number'] ? 'Room ' . htmlspecialchars($row['room_number']) : 'Unassigned' ?></td>
                                     <td>
                                         <?php if ($row['occupancy_status'] === 'occupied'): ?>
                                             <span class="tag tag-warning">Occupied</span>
@@ -251,7 +224,7 @@ $bedList = $con->query($sqlBeds);
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <a href="beds.php?edit_id=<?php echo intval($row['bed_id']); ?>" class="link-button">Edit</a>
+                                        <a href="beds.php?edit_id=<?= intval($row['bed_id']) ?>" class="link-button">Edit</a>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
@@ -266,4 +239,4 @@ $bedList = $con->query($sqlBeds);
         </section>
     </main>
 </body>
-</html>c
+</html>
